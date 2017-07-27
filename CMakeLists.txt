@@ -11,11 +11,27 @@ option(KEEP_SML_AT_LATEST "ensure that SML it at lastest master on each build" O
 set(sml_update_command)
 if (NOT KEEP_SML_AT_LATEST)
     set(sml_update_command UPDATE_COMMAND "")
-    endif()
+endif ()
 
 
 project(goblinz)
 set(CMAKE_CXX_STANDARD 14)
+
+#
+# check out github.com/ruslo  projects hunter, sugar and polly - probably the greatest leaps forward in cmakery ever
+#
+hunter_add_package(Sugar)
+include(${SUGAR_ROOT}/cmake/Sugar)
+include(sugar_files)
+include(sugar_include)
+
+#
+# doxygen?
+#
+find_package(Doxygen QUIET)
+if (DOXYGEN_FOUND)
+    include(sugar_doxygen_generate)
+endif ()
 
 #
 # load up dependencies
@@ -43,7 +59,15 @@ target_link_libraries(boost_sml INTERFACE Boost::boost)
 add_library(Boost::sml ALIAS boost_sml)
 
 
-
-set(SOURCE_FILES main.cpp)
+sugar_files(SOURCE_FILES main.cpp)
 add_executable(goblinz ${SOURCE_FILES})
 target_link_libraries(goblinz Boost::system Boost::sml)
+
+if (DOXYGEN_FOUND)
+    sugar_doxygen_generate(DEVELOPER TARGET goblinz DOXYTARGET gobliz-doc DOXYFILE ${SUGAR_ROOT}/examples/Doxyfile.in)
+endif ()
+
+add_custom_target(everything ALL DEPENDS goblinz)
+if (TARGET gobliz-doc)
+    add_dependencies(everything gobliz-doc)
+endif ()

@@ -46,7 +46,8 @@ struct kill_a_pleb {
  * This is a hack to get around a perceived limitation in the transition table, in that the first match
  * is executed, not subsequent matches of the same event in the same state
  */
-struct try_to_kill_again {};
+struct try_to_kill_again {
+};
 
 
 /** Vital details about a goblin
@@ -97,7 +98,7 @@ auto be_named = [](goblin_character_sheet &sheet, birth event) {
 /** Action indicating that a goblin has been forgotten. Remove his vile carcass from the battlefield!
  *
  */
-auto forget_me = [](goblin_io &io, goblin_character_sheet& cs) {
+auto forget_me = [](goblin_io &io, goblin_character_sheet &cs) {
     std::cout << cs.name << " has been forgotten..." << std::endl;
     io.set_done();
 };
@@ -135,14 +136,13 @@ auto enough_dead = [](goblin_character_sheet &cs) -> bool {
 /** Announce the sad news that the goblin has died, and make preparations to forget he ever existed
  *
  */
-auto announce_death = [](auto &&event, auto &&sm, auto &&deps, auto &&subs)
-{
-    auto& cs = sml::aux::get<goblin_character_sheet&>(deps);
-    auto& io = sml::aux::get<goblin_io&>(deps);
+auto announce_death = [](auto &&event, auto &&sm, auto &&deps, auto &&subs) {
+    auto &cs = sml::aux::get<goblin_character_sheet &>(deps);
+    auto &io = sml::aux::get<goblin_io &>(deps);
 
     std::cout << cs.name << " died after killin' " << cs.kill_count << " smelly 'umans" << std::endl;
     io.kill_timer.expires_from_now(boost::posix_time::milliseconds(1000));
-    io.kill_timer.async_wait(io.strand.wrap([&](auto err){
+    io.kill_timer.async_wait(io.strand.wrap([&](auto err) {
         if (not err) {
             sm.process_event(forget(), deps, subs);
         }
@@ -166,16 +166,21 @@ struct goblin_state {
         auto killing_folk = state<class killing_folk>;
         auto dead = state<class dead>;
 
+        auto wonder_what_it_was_all_for = [] {};
+        auto utter_expletives = [] {};
+
         return make_transition_table(
-                *unborn + be_born / (be_named, start_killin) = killing_folk,
+                // @formatter:off
+                * unborn      + be_born                       / (be_named, start_killin)   = killing_folk,
 
-                killing_folk + yarrgh / (score_kill),
-                killing_folk + kill_again [!enough_dead] / start_killin,
-                killing_folk + kill_again [enough_dead] / [] {} = dead,
-                killing_folk + be_dead = dead,
+                  killing_folk + yarrgh                       / score_kill,
+                  killing_folk + kill_again [not enough_dead] / start_killin,
+                  killing_folk + kill_again [enough_dead]     / utter_expletives           = dead,
+                  killing_folk + be_dead                      / wonder_what_it_was_all_for = dead,
 
-                dead + on_entry<_> / announce_death,
-                dead + be_forgotten / forget_me = X
+                  dead + on_entry<_>                          / announce_death,
+                  dead + be_forgotten                         / forget_me                  = X
+                // @formatter:on
         );
     }
 
