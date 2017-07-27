@@ -50,6 +50,13 @@ struct try_to_kill_again {
 };
 
 
+/** The goblin stops to wonder what to do
+ *
+ */
+struct wonder_what_to_do {
+
+};
+
 /** Vital details about a goblin
  *
  */
@@ -117,6 +124,16 @@ auto start_killin = [](auto &&event, auto &&sm, auto &&deps, auto &&subs) {
     }));
 };
 
+auto start_kill_timer = [](auto &&event, auto &&sm, auto &&deps, auto &&...otherstuff) {
+    auto &io = sml::aux::get<goblin_io &>(deps);
+    io.kill_timer.expires_from_now(boost::posix_time::milliseconds(200));
+    io.kill_timer.async_wait(io.strand.wrap([&](auto err) {
+        if (not err) {
+            sm.process_event(try_to_kill_again(), deps, otherstuff...);
+        }
+    }));
+};
+
 /** The goblin marks his scorecard
  *
  */
@@ -136,7 +153,7 @@ auto enough_dead = [](goblin_character_sheet &cs) -> bool {
 /** Thinking of the future evolution of this game, we won't want to leave dangling timers lying about if
  * someone other than himself kills the goblin.
  */
-auto cleanup_io_state = [](goblin_io& io)
+auto cancel_kill_timer = [](goblin_io& io)
 {
     boost::system::error_code sink;
     io.kill_timer.cancel(sink);
@@ -159,6 +176,27 @@ auto announce_death = [](auto &&event, auto &&sm, auto &&deps, auto &&subs) {
     }));
 };
 
+
+struct wondering {
+    auto operator()() const {
+        using namespace sml;
+
+        auto wonder = event<wonder_what_to_do>;
+        auto kill_again = event<try_to_kill_again>;
+        auto be_dead = event<die>;
+
+        auto waiting = state<class waiting>;
+
+        return make_transition_table(
+        // @formatter:off
+            * waiting + on_entry<_> [not enough_dead] / start_kill_timer,
+              waiting + on_entry<_> [enough_dead] / be_dead               = X,
+              waiting + on_exit<_> / cancel_kill_timer,
+              waiting + kill_again                                        = X
+        // @formatter:on
+        );
+    }
+};
 /** A goblin's modus operandi
  *
  */
@@ -181,13 +219,10 @@ struct goblin_state {
 
         return make_transition_table(
                 // @formatter:off
-                * unborn      + be_born                       / (be_named, start_killin)   = killing_folk,
+                * unborn      + be_born                       / (be_named)   = state<wondering>,
 
-                  killing_folk + yarrgh                       / score_kill,
-                  killing_folk + kill_again [not enough_dead] / start_killin,
-                  killing_folk + kill_again [enough_dead]     / utter_expletives           = dead,
-                  killing_folk + be_dead                      / wonder_what_it_was_all_for = dead,
-                  killing_folk + on_exit<_>                   / cleanup_io_state,
+                  state<wondering> + kill_again              / score_kill   = state<wondering>,
+                  state<wondering> + be_dead                 / wonder_what_it_was_all_for = dead,
 
                   dead + on_entry<_>                          / announce_death,
                   dead + be_forgotten                         / forget_me                  = X
