@@ -133,6 +133,16 @@ auto enough_dead = [](goblin_character_sheet &cs) -> bool {
     return cs.kill_count >= 5;
 };
 
+/** Thinking of the future evolution of this game, we won't want to leave dangling timers lying about if
+ * someone other than himself kills the goblin.
+ */
+auto cleanup_io_state = [](goblin_io& io)
+{
+    boost::system::error_code sink;
+    io.kill_timer.cancel(sink);
+};
+
+
 /** Announce the sad news that the goblin has died, and make preparations to forget he ever existed
  *
  */
@@ -177,6 +187,7 @@ struct goblin_state {
                   killing_folk + kill_again [not enough_dead] / start_killin,
                   killing_folk + kill_again [enough_dead]     / utter_expletives           = dead,
                   killing_folk + be_dead                      / wonder_what_it_was_all_for = dead,
+                  killing_folk + on_exit<_>                   / cleanup_io_state,
 
                   dead + on_entry<_>                          / announce_death,
                   dead + be_forgotten                         / forget_me                  = X
