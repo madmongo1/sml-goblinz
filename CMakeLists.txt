@@ -38,6 +38,7 @@ endif ()
 #
 hunter_add_package(Boost COMPONENTS system)
 find_package(Boost CONFIG COMPONENTS system)
+find_package(Threads)
 
 #
 # load up sml
@@ -61,7 +62,7 @@ add_library(Boost::sml ALIAS boost_sml)
 
 sugar_files(SOURCE_FILES main.cpp)
 add_executable(goblinz ${SOURCE_FILES})
-target_link_libraries(goblinz Boost::system Boost::sml)
+target_link_libraries(goblinz Boost::system Boost::sml ${CMAKE_THREAD_LIBS_INIT})
 
 if (DOXYGEN_FOUND)
     sugar_doxygen_generate(DEVELOPER TARGET goblinz DOXYTARGET gobliz-doc DOXYFILE ${SUGAR_ROOT}/examples/Doxyfile.in)
